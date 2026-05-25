@@ -150,6 +150,18 @@ export default function AjustesScreen() {
 
       <Button label="Guardar cambios" onPress={handleGuardar} loading={guardando} />
 
+      {/* Clientes */}
+      <View style={styles.seccion}>
+        <Text style={styles.seccionTitulo}>Datos</Text>
+        <TouchableOpacity style={styles.enlace} onPress={() => router.push('/clientes')}>
+          <View>
+            <Text style={styles.enlaceTitulo}>Clientes</Text>
+            <Text style={styles.enlaceDesc}>Gestiona tus clientes y sus datos de contacto</Text>
+          </View>
+          <Text style={styles.enlaceArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Configuración avanzada */}
       <View style={styles.seccion}>
         <Text style={styles.seccionTitulo}>Configuración fiscal</Text>
