@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\alfre\\\\.claude\\\\projects\\\\C--Users-alfre-Desktop-ReformIA\\\\memory\")",
+      "Bash(Out-Null)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "Bash(git add *)"
+    ]
+  }
+}

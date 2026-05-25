@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "msjsdiag.vscode-react-native",
+    "usernamehw.errorlens",
+    "eamodio.gitlens",
+    "supabase.vb-supabase",
+    "bradlc.vscode-tailwindcss",
+    "christian-kohler.path-intellisense"
+  ]
+}
