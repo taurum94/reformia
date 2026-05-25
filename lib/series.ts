@@ -9,13 +9,16 @@ export async function siguienteNumero(
   empresaId: string,
   tipo: 'presupuesto' | 'factura'
 ): Promise<string> {
-  // 1. Buscar serie existente
-  let { data: serie, error } = await supabase
+  // 1. Buscar serie existente — limit(1) evita fallos con filas duplicadas
+  const { data: filas } = await supabase
     .from('series_numericas')
     .select('*')
     .eq('empresa_id', empresaId)
     .eq('tipo', tipo)
-    .maybeSingle()       // maybeSingle no lanza error si no hay fila
+    .order('ultimo_numero', { ascending: false })
+    .limit(1)
+
+  let serie = filas?.[0] ?? null
 
   // 2. Si no existe, crear una por defecto
   if (!serie) {
