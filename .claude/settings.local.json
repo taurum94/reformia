@@ -5,7 +5,8 @@
       "Bash(Out-Null)",
       "PowerShell(node --version)",
       "PowerShell(npm --version)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
