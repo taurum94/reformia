@@ -150,6 +150,26 @@ export default function AjustesScreen() {
 
       <Button label="Guardar cambios" onPress={handleGuardar} loading={guardando} />
 
+      {/* Configuración avanzada */}
+      <View style={styles.seccion}>
+        <Text style={styles.seccionTitulo}>Configuración fiscal</Text>
+        <TouchableOpacity style={styles.enlace} onPress={() => router.push('/configuracion/series')}>
+          <View>
+            <Text style={styles.enlaceTitulo}>Series numéricas</Text>
+            <Text style={styles.enlaceDesc}>Formato de numeración de presupuestos y facturas</Text>
+          </View>
+          <Text style={styles.enlaceArrow}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separador} />
+        <TouchableOpacity style={styles.enlace} onPress={() => router.push('/configuracion/iva')}>
+          <View>
+            <Text style={styles.enlaceTitulo}>Tipos de IVA</Text>
+            <Text style={styles.enlaceDesc}>Configura los porcentajes de IVA aplicables</Text>
+          </View>
+          <Text style={styles.enlaceArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Cerrar sesión */}
       <TouchableOpacity style={styles.cerrarSesion} onPress={handleCerrarSesion}>
         <Text style={styles.cerrarSesionText}>Cerrar sesión</Text>
@@ -181,4 +201,14 @@ const styles = StyleSheet.create({
   },
   cerrarSesion: { alignItems: 'center', paddingVertical: 12 },
   cerrarSesionText: { color: Colors.error, fontWeight: '600', fontSize: 15 },
+  enlace: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  enlaceTitulo: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  enlaceDesc: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  enlaceArrow: { fontSize: 22, color: Colors.muted, fontWeight: '300' },
+  separador: { height: 1, backgroundColor: Colors.border },
 })
