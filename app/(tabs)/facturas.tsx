@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { useEmpresa } from '../../hooks/useEmpresa'
 import { useFacturas } from '../../hooks/useFacturas'
 import { EstadoBadge } from '../../components/ui/EstadoBadge'
@@ -17,8 +17,10 @@ const ESTADOS: { valor: EstadoFactura | 'todos'; label: string }[] = [
 
 export default function FacturasScreen() {
   const { empresa } = useEmpresa()
-  const { facturas, loading } = useFacturas(empresa?.id)
+  const { facturas, loading, recargar } = useFacturas(empresa?.id)
   const [filtro, setFiltro] = useState<EstadoFactura | 'todos'>('todos')
+
+  useFocusEffect(useCallback(() => { recargar() }, [empresa?.id]))
 
   const filtradas = filtro === 'todos' ? facturas : facturas.filter(f => f.estado === filtro)
 

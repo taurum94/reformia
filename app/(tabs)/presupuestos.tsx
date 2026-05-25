@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { useEmpresa } from '../../hooks/useEmpresa'
 import { usePresupuestos } from '../../hooks/usePresupuestos'
 import { EstadoBadge } from '../../components/ui/EstadoBadge'
@@ -21,6 +21,8 @@ export default function PresupuestosScreen() {
   const { empresa } = useEmpresa()
   const { presupuestos, loading, recargar } = usePresupuestos(empresa?.id)
   const [filtro, setFiltro] = useState<EstadoPresupuesto | 'todos'>('todos')
+
+  useFocusEffect(useCallback(() => { recargar() }, [empresa?.id]))
 
   const filtrados = filtro === 'todos'
     ? presupuestos
