@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../../lib/supabase'
+import { siguienteNumero } from '../../lib/series'
 import { useEmpresa } from '../../hooks/useEmpresa'
 import { usePresupuestos, useLineasPresupuesto } from '../../hooks/usePresupuestos'
 import { EstadoBadge } from '../../components/ui/EstadoBadge'
@@ -42,21 +43,8 @@ export default function PresupuestoDetalleScreen() {
         text: 'Convertir', onPress: async () => {
           setAccionando(true)
           try {
-            // Obtener siguiente número de serie de facturas
-            const { data: serie } = await supabase
-              .from('series_numericas')
-              .select('*')
-              .eq('empresa_id', empresa!.id)
-              .eq('tipo', 'factura')
-              .single()
-
-            const siguiente = (serie?.ultimo_numero ?? 0) + 1
-            const año = new Date().getFullYear()
-            const digitos = serie?.digitos ?? 4
-            const num = String(siguiente).padStart(digitos, '0')
-            const numero = serie?.año_automatico
-              ? `${serie.prefijo}-${año}-${num}`
-              : `${serie?.prefijo ?? 'FAC'}-${num}`
+            // Obtener siguiente número de serie de facturas (crea la serie si no existe)
+            const numero = await siguienteNumero(empresa!.id, 'factura')
 
             // Crear factura
             const { data: factura, error } = await supabase
@@ -85,8 +73,6 @@ export default function PresupuestoDetalleScreen() {
             }))
             await supabase.from('lineas_factura').insert(lineasFactura)
 
-            // Actualizar serie y estado del presupuesto
-            if (serie) await supabase.from('series_numericas').update({ ultimo_numero: siguiente }).eq('id', serie.id)
             await actualizar(id, { estado: 'aceptado' })
 
             Alert.alert('✓ Factura creada', `Factura ${numero} generada`, [

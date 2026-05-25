@@ -8,6 +8,7 @@ import { useEmpresa } from '../../hooks/useEmpresa'
 import { consultarAgente, calcularLinea, type LineaGenerada, type RespuestaAgente } from '../../lib/agente'
 import { supabase } from '../../lib/supabase'
 import type { MensajeChat } from '../../lib/groq'
+import { siguienteNumero } from '../../lib/series'
 import { Colors } from '../../constants/colors'
 
 type Mensaje = {
@@ -143,21 +144,8 @@ export default function AgenteScreen() {
     if (!empresa?.id) return
     setGuardandoPresupuesto(true)
     try {
-      // Obtener siguiente número de serie
-      const { data: serie } = await supabase
-        .from('series_numericas')
-        .select('*')
-        .eq('empresa_id', empresa.id)
-        .eq('tipo', 'presupuesto')
-        .single()
-
-      const siguiente = (serie?.ultimo_numero ?? 0) + 1
-      const año = new Date().getFullYear()
-      const digitos = serie?.digitos ?? 4
-      const num = String(siguiente).padStart(digitos, '0')
-      const numero = serie?.año_automatico !== false
-        ? `${serie?.prefijo ?? 'PRES'}-${año}-${num}`
-        : `${serie?.prefijo ?? 'PRES'}-${num}`
+      // Obtener siguiente número de serie (crea la serie si no existe)
+      const numero = await siguienteNumero(empresa.id, 'presupuesto')
 
       // Crear presupuesto
       const { data: presupuesto, error } = await supabase
@@ -182,12 +170,9 @@ export default function AgenteScreen() {
         margen_porcentaje: l.margen_porcentaje,
         orden: i,
       }))
-      await supabase.from('lineas_presupuesto').insert(lineasDB)
-
-      // Actualizar último número de serie
-      if (serie) {
-        await supabase.from('series_numericas').update({ ultimo_numero: siguiente }).eq('id', serie.id)
-      }
+      if (lineasDB.length === 0) throw new Error('No hay partidas para guardar')
+      const { error: lineasError } = await supabase.from('lineas_presupuesto').insert(lineasDB)
+      if (lineasError) throw lineasError
 
       // Confirmar en el chat con enlace para navegar
       setMensajes(prev => [...prev, {
