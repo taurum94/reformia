@@ -24,10 +24,11 @@ const SUGERENCIAS = [
   'Solado de salón 30m² con porcelánico 60x60',
 ]
 
-function BurbujaMensaje({ msg, preciosHora, onGuardar }: {
+function BurbujaMensaje({ msg, preciosHora, onGuardar, guardando }: {
   msg: Mensaje
   preciosHora: Record<string, number>
   onGuardar: (lineas: LineaGenerada[]) => void
+  guardando?: boolean
 }) {
   const esUsuario = msg.role === 'user'
   const lineasCalculadas = msg.lineas?.map(l =>
@@ -60,8 +61,15 @@ function BurbujaMensaje({ msg, preciosHora, onGuardar }: {
             <Text style={styles.totalLabel}>Total sin IVA</Text>
             <Text style={styles.totalValor}>{total.toFixed(2)}€</Text>
           </View>
-          <TouchableOpacity style={styles.btnGuardar} onPress={() => onGuardar(lineasCalculadas)}>
-            <Text style={styles.btnGuardarText}>Guardar como presupuesto →</Text>
+          <TouchableOpacity
+            style={[styles.btnGuardar, guardando && { opacity: 0.6 }]}
+            onPress={() => !guardando && onGuardar(lineasCalculadas)}
+            disabled={guardando}
+          >
+            {guardando
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={styles.btnGuardarText}>Guardar como presupuesto →</Text>
+            }
           </TouchableOpacity>
         </View>
       )}
@@ -75,6 +83,7 @@ export default function AgenteScreen() {
   const [historial, setHistorial] = useState<MensajeChat[]>([])
   const [input, setInput] = useState('')
   const [cargando, setCargando] = useState(false)
+  const [guardandoPresupuesto, setGuardandoPresupuesto] = useState(false)
   const [preciosHora, setPreciosHora] = useState<Record<string, number>>({
     albanileria: 18, electricidad: 22, fontaneria: 20,
     carpinteria: 20, pintura: 16, solados: 19, yeso: 17,
@@ -132,72 +141,68 @@ export default function AgenteScreen() {
 
   async function guardarPresupuesto(lineas: LineaGenerada[]) {
     if (!empresa?.id) return
+    setGuardandoPresupuesto(true)
+    try {
+      // Obtener siguiente número de serie
+      const { data: serie } = await supabase
+        .from('series_numericas')
+        .select('*')
+        .eq('empresa_id', empresa.id)
+        .eq('tipo', 'presupuesto')
+        .single()
 
-    Alert.alert('Guardar presupuesto', '¿Quieres guardar este presupuesto?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Guardar', onPress: async () => {
-          try {
-            // Obtener siguiente número de serie
-            const { data: serie } = await supabase
-              .from('series_numericas')
-              .select('*')
-              .eq('empresa_id', empresa.id)
-              .eq('tipo', 'presupuesto')
-              .single()
+      const siguiente = (serie?.ultimo_numero ?? 0) + 1
+      const año = new Date().getFullYear()
+      const digitos = serie?.digitos ?? 4
+      const num = String(siguiente).padStart(digitos, '0')
+      const numero = serie?.año_automatico !== false
+        ? `${serie?.prefijo ?? 'PRES'}-${año}-${num}`
+        : `${serie?.prefijo ?? 'PRES'}-${num}`
 
-            const siguiente = (serie?.ultimo_numero ?? 0) + 1
-            const año = new Date().getFullYear()
-            const digitos = serie?.digitos ?? 4
-            const num = String(siguiente).padStart(digitos, '0')
-            const numero = serie?.año_automatico
-              ? `${serie.prefijo}-${año}-${num}`
-              : `${serie?.prefijo ?? 'PRES'}-${num}`
+      // Crear presupuesto
+      const { data: presupuesto, error } = await supabase
+        .from('presupuestos')
+        .insert({ empresa_id: empresa.id, numero, fecha: new Date().toISOString().split('T')[0], estado: 'borrador' })
+        .select()
+        .single()
+      if (error) throw error
 
-            // Crear presupuesto
-            const { data: presupuesto, error } = await supabase
-              .from('presupuestos')
-              .insert({ empresa_id: empresa.id, numero, fecha: new Date().toISOString().split('T')[0], estado: 'borrador' })
-              .select()
-              .single()
-            if (error) throw error
+      // Crear líneas
+      const lineasDB = lineas.map((l, i) => ({
+        presupuesto_id: presupuesto.id,
+        descripcion: l.descripcion,
+        unidad: l.unidad,
+        cantidad: l.cantidad,
+        precio_unitario: Number((l.precio_unitario ?? 0).toFixed(2)),
+        iva_porcentaje: l.iva_porcentaje,
+        horas_mano_obra: l.horas_mano_obra,
+        coste_hora: preciosHora[l.categoria_mano_obra] ?? 18,
+        materiales_coste: l.materiales_coste,
+        indirectos_porcentaje: l.indirectos_porcentaje,
+        margen_porcentaje: l.margen_porcentaje,
+        orden: i,
+      }))
+      await supabase.from('lineas_presupuesto').insert(lineasDB)
 
-            // Crear líneas
-            const lineasDB = lineas.map((l, i) => ({
-              presupuesto_id: presupuesto.id,
-              descripcion: l.descripcion,
-              unidad: l.unidad,
-              cantidad: l.cantidad,
-              precio_unitario: Number((l.precio_unitario ?? 0).toFixed(2)),
-              iva_porcentaje: l.iva_porcentaje,
-              horas_mano_obra: l.horas_mano_obra,
-              coste_hora: preciosHora[l.categoria_mano_obra] ?? 18,
-              materiales_coste: l.materiales_coste,
-              indirectos_porcentaje: l.indirectos_porcentaje,
-              margen_porcentaje: l.margen_porcentaje,
-              orden: i,
-            }))
+      // Actualizar último número de serie
+      if (serie) {
+        await supabase.from('series_numericas').update({ ultimo_numero: siguiente }).eq('id', serie.id)
+      }
 
-            await supabase.from('lineas_presupuesto').insert(lineasDB)
-
-            // Actualizar último número de serie
-            if (serie) {
-              await supabase
-                .from('series_numericas')
-                .update({ ultimo_numero: siguiente })
-                .eq('id', serie.id)
-            }
-
-            Alert.alert('✓ Guardado', `Presupuesto ${numero} creado`, [
-              { text: 'Ver presupuesto', onPress: () => router.push('/presupuestos') },
-              { text: 'Seguir aquí', style: 'cancel' },
-            ])
-          } catch (e: any) {
-            Alert.alert('Error', e.message)
-          }
-        }
-      },
-    ])
+      // Confirmar en el chat con enlace para navegar
+      setMensajes(prev => [...prev, {
+        role: 'assistant',
+        content: `✓ Presupuesto ${numero} guardado correctamente. Puedes verlo en la pestaña Presupuestos.`,
+      }])
+      router.push('/presupuestos')
+    } catch (e: any) {
+      setMensajes(prev => [...prev, {
+        role: 'assistant',
+        content: `Error al guardar el presupuesto: ${e.message}`,
+      }])
+    } finally {
+      setGuardandoPresupuesto(false)
+    }
   }
 
   return (
@@ -227,7 +232,7 @@ export default function AgenteScreen() {
         )}
 
         {mensajes.map((msg, i) => (
-          <BurbujaMensaje key={i} msg={msg} preciosHora={preciosHora} onGuardar={guardarPresupuesto} />
+          <BurbujaMensaje key={i} msg={msg} preciosHora={preciosHora} onGuardar={guardarPresupuesto} guardando={guardandoPresupuesto} />
         ))}
 
         {cargando && (
