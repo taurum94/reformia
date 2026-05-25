@@ -150,13 +150,37 @@ export default function AjustesScreen() {
 
       <Button label="Guardar cambios" onPress={handleGuardar} loading={guardando} />
 
-      {/* Clientes */}
+      {/* Datos */}
       <View style={styles.seccion}>
         <Text style={styles.seccionTitulo}>Datos</Text>
         <TouchableOpacity style={styles.enlace} onPress={() => router.push('/clientes')}>
           <View>
             <Text style={styles.enlaceTitulo}>Clientes</Text>
             <Text style={styles.enlaceDesc}>Gestiona tus clientes y sus datos de contacto</Text>
+          </View>
+          <Text style={styles.enlaceArrow}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separador} />
+        <TouchableOpacity style={styles.enlace} onPress={() => router.push('/proveedores')}>
+          <View>
+            <Text style={styles.enlaceTitulo}>Proveedores</Text>
+            <Text style={styles.enlaceDesc}>Gestiona tus proveedores de materiales</Text>
+          </View>
+          <Text style={styles.enlaceArrow}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separador} />
+        <TouchableOpacity style={styles.enlace} onPress={() => router.push('/materiales')}>
+          <View>
+            <Text style={styles.enlaceTitulo}>Materiales</Text>
+            <Text style={styles.enlaceDesc}>Catálogo de materiales y unidades</Text>
+          </View>
+          <Text style={styles.enlaceArrow}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separador} />
+        <TouchableOpacity style={styles.enlace} onPress={() => router.push('/configuracion/precios')}>
+          <View>
+            <Text style={styles.enlaceTitulo}>Precios mano de obra</Text>
+            <Text style={styles.enlaceDesc}>Coste por hora de cada categoría de trabajo</Text>
           </View>
           <Text style={styles.enlaceArrow}>›</Text>
         </TouchableOpacity>
