@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, ActivityIn
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { siguienteNumero } from '../../lib/series'
+import { htmlPresupuesto, exportarPDF } from '../../lib/pdf'
 import { useEmpresa } from '../../hooks/useEmpresa'
 import { usePresupuestos, useLineasPresupuesto } from '../../hooks/usePresupuestos'
 import { EstadoBadge } from '../../components/ui/EstadoBadge'
@@ -19,6 +20,7 @@ export default function PresupuestoDetalleScreen() {
   const { lineas, loading: loadingLineas } = useLineasPresupuesto(id)
   const [accionando, setAccionando] = useState(false)
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
+  const [exportando, setExportando] = useState(false)
 
   const presupuesto = presupuestos.find(p => p.id === id)
 
@@ -29,6 +31,24 @@ export default function PresupuestoDetalleScreen() {
   const baseImponible = lineas.reduce((s, l) => s + l.cantidad * l.precio_unitario, 0)
   const totalIva = lineas.reduce((s, l) => s + l.cantidad * l.precio_unitario * (l.iva_porcentaje / 100), 0)
   const total = baseImponible + totalIva
+
+  async function handleExportarPDF() {
+    if (!empresa) return
+    setExportando(true)
+    try {
+      let cliente = null
+      if (presupuesto.cliente_id) {
+        const { data } = await supabase.from('clientes').select('nombre,nif,direccion,email,telefono').eq('id', presupuesto.cliente_id).single()
+        cliente = data
+      }
+      const html = htmlPresupuesto(empresa, presupuesto, lineas, cliente)
+      await exportarPDF(html, presupuesto.numero)
+    } catch (e: any) {
+      Alert.alert('Error al generar PDF', e.message)
+    } finally {
+      setExportando(false)
+    }
+  }
 
   async function cambiarEstado(estado: EstadoPresupuesto) {
     setAccionando(true)
@@ -178,6 +198,14 @@ export default function PresupuestoDetalleScreen() {
               ))}
           </View>
         </View>
+
+        {/* Exportar PDF */}
+        <Button
+          label="Exportar / Compartir PDF"
+          onPress={handleExportarPDF}
+          variante="secondary"
+          loading={exportando}
+        />
 
         {/* Acción principal */}
         {presupuesto.estado !== 'rechazado' && (

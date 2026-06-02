@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { View, Text, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
+import { supabase } from '../../lib/supabase'
+import { htmlFactura, exportarPDF } from '../../lib/pdf'
 import { useEmpresa } from '../../hooks/useEmpresa'
 import { useFacturas, useLineasFactura } from '../../hooks/useFacturas'
 import { EstadoBadge } from '../../components/ui/EstadoBadge'
@@ -17,6 +19,7 @@ export default function FacturaDetalleScreen() {
   const { lineas, loading: loadingLineas } = useLineasFactura(id)
   const [accionando, setAccionando] = useState(false)
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
+  const [exportando, setExportando] = useState(false)
 
   const factura = facturas.find(f => f.id === id)
 
@@ -34,6 +37,24 @@ export default function FacturaDetalleScreen() {
   const baseImponible = lineas.reduce((s, l) => s + l.cantidad * l.precio_unitario, 0)
   const totalIva = Object.values(ivaDesglose).reduce((s, v) => s + v, 0)
   const total = baseImponible + totalIva
+
+  async function handleExportarPDF() {
+    if (!empresa) return
+    setExportando(true)
+    try {
+      let cliente = null
+      if (factura.cliente_id) {
+        const { data } = await supabase.from('clientes').select('nombre,nif,direccion,email,telefono').eq('id', factura.cliente_id).single()
+        cliente = data
+      }
+      const html = htmlFactura(empresa, factura, lineas, cliente)
+      await exportarPDF(html, factura.numero)
+    } catch (e: any) {
+      Alert.alert('Error al generar PDF', e.message)
+    } finally {
+      setExportando(false)
+    }
+  }
 
   async function cambiarEstado(estado: EstadoFactura) {
     setAccionando(true)
@@ -142,6 +163,13 @@ export default function FacturaDetalleScreen() {
             ))}
           </View>
         </View>
+
+        <Button
+          label="Exportar / Compartir PDF"
+          onPress={handleExportarPDF}
+          variante="secondary"
+          loading={exportando}
+        />
 
         <Button
           label={confirmandoEliminar ? '¿Seguro? Pulsa de nuevo para confirmar' : 'Eliminar factura'}
