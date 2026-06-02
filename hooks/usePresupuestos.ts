@@ -76,5 +76,23 @@ export function useLineasPresupuesto(presupuestoId: string | undefined) {
     setLoading(false)
   }
 
-  return { lineas, loading, recargar: cargar }
+  async function crearLinea(campos: Omit<LineaPresupuesto, 'id'>) {
+    const { error } = await supabase.from('lineas_presupuesto').insert(campos)
+    if (error) throw error
+    await cargar()
+  }
+
+  async function actualizarLinea(id: string, campos: Partial<LineaPresupuesto>) {
+    const { error } = await supabase.from('lineas_presupuesto').update(campos).eq('id', id)
+    if (error) throw error
+    await cargar()
+  }
+
+  async function eliminarLinea(id: string) {
+    const { error } = await supabase.from('lineas_presupuesto').delete().eq('id', id)
+    if (error) throw error
+    await cargar()
+  }
+
+  return { lineas, loading, recargar: cargar, crearLinea, actualizarLinea, eliminarLinea }
 }

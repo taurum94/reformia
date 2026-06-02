@@ -8,8 +8,9 @@ import { useEmpresa } from '../../hooks/useEmpresa'
 import { usePresupuestos, useLineasPresupuesto } from '../../hooks/usePresupuestos'
 import { EstadoBadge } from '../../components/ui/EstadoBadge'
 import { Button } from '../../components/ui/Button'
+import { LineaModal, type CamposLinea } from '../../components/ui/LineaModal'
 import { Colors } from '../../constants/colors'
-import type { EstadoPresupuesto } from '../../types/database'
+import type { EstadoPresupuesto, LineaPresupuesto } from '../../types/database'
 
 function fmt(n: number) { return n.toFixed(2).replace('.', ',') + ' €' }
 
@@ -17,10 +18,11 @@ export default function PresupuestoDetalleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { empresa } = useEmpresa()
   const { presupuestos, actualizar, eliminar } = usePresupuestos(empresa?.id)
-  const { lineas, loading: loadingLineas } = useLineasPresupuesto(id)
+  const { lineas, loading: loadingLineas, crearLinea, actualizarLinea, eliminarLinea } = useLineasPresupuesto(id)
   const [accionando, setAccionando] = useState(false)
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
   const [exportando, setExportando] = useState(false)
+  const [lineaModal, setLineaModal] = useState<{ visible: boolean; linea?: LineaPresupuesto }>({ visible: false })
 
   const presupuesto = presupuestos.find(p => p.id === id)
 
@@ -142,14 +144,23 @@ export default function PresupuestoDetalleScreen() {
 
         {/* Líneas */}
         <View style={styles.seccion}>
-          <Text style={styles.seccionTitulo}>Partidas</Text>
+          <View style={styles.seccionHeader}>
+            <Text style={styles.seccionTitulo}>Partidas</Text>
+            <TouchableOpacity style={styles.btnAnadir} onPress={() => setLineaModal({ visible: true })}>
+              <Text style={styles.btnAnadirTexto}>+ Añadir</Text>
+            </TouchableOpacity>
+          </View>
           {loadingLineas ? (
             <ActivityIndicator color={Colors.primary} />
           ) : lineas.length === 0 ? (
             <Text style={styles.sinLineas}>Sin partidas</Text>
           ) : (
             lineas.map((l, i) => (
-              <View key={l.id} style={[styles.linea, i < lineas.length - 1 && styles.lineaBorde]}>
+              <TouchableOpacity
+                key={l.id}
+                style={[styles.linea, i < lineas.length - 1 && styles.lineaBorde]}
+                onPress={() => setLineaModal({ visible: true, linea: l })}
+              >
                 <View style={styles.lineaTop}>
                   <Text style={styles.lineaDesc}>{l.descripcion}</Text>
                   <Text style={styles.lineaTotal}>{fmt(l.cantidad * l.precio_unitario)}</Text>
@@ -157,7 +168,7 @@ export default function PresupuestoDetalleScreen() {
                 <Text style={styles.lineaDetalle}>
                   {l.cantidad} {l.unidad} × {fmt(l.precio_unitario)} · IVA {l.iva_porcentaje}%
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))
           )}
 
@@ -223,6 +234,24 @@ export default function PresupuestoDetalleScreen() {
         />
 
       </ScrollView>
+
+      <LineaModal
+        visible={lineaModal.visible}
+        onClose={() => setLineaModal({ visible: false })}
+        inicial={lineaModal.linea}
+        onGuardar={async (campos: CamposLinea) => {
+          if (lineaModal.linea) {
+            await actualizarLinea(lineaModal.linea.id, campos)
+          } else {
+            await crearLinea({
+              ...campos,
+              presupuesto_id: id,
+              orden: lineas.length,
+            })
+          }
+        }}
+        onEliminar={lineaModal.linea ? () => eliminarLinea(lineaModal.linea!.id) : undefined}
+      />
     </>
   )
 }
@@ -237,7 +266,10 @@ const styles = StyleSheet.create({
   fecha: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   cliente: { fontSize: 14, fontWeight: '600', color: Colors.primary },
   seccion: { backgroundColor: Colors.surface, borderRadius: 14, padding: 18, gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  seccionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   seccionTitulo: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
+  btnAnadir: { backgroundColor: Colors.accent, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
+  btnAnadirTexto: { color: '#fff', fontWeight: '700', fontSize: 13 },
   sinLineas: { fontSize: 14, color: Colors.textSecondary },
   linea: { paddingVertical: 10, gap: 3 },
   lineaBorde: { borderBottomWidth: 1, borderBottomColor: Colors.border },

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { htmlFactura, exportarPDF } from '../../lib/pdf'
@@ -7,8 +7,9 @@ import { useEmpresa } from '../../hooks/useEmpresa'
 import { useFacturas, useLineasFactura } from '../../hooks/useFacturas'
 import { EstadoBadge } from '../../components/ui/EstadoBadge'
 import { Button } from '../../components/ui/Button'
+import { LineaModal, type CamposLinea } from '../../components/ui/LineaModal'
 import { Colors } from '../../constants/colors'
-import type { EstadoFactura } from '../../types/database'
+import type { EstadoFactura, LineaFactura } from '../../types/database'
 
 function fmt(n: number) { return n.toFixed(2).replace('.', ',') + ' €' }
 
@@ -16,10 +17,11 @@ export default function FacturaDetalleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { empresa } = useEmpresa()
   const { facturas, actualizar, eliminar } = useFacturas(empresa?.id)
-  const { lineas, loading: loadingLineas } = useLineasFactura(id)
+  const { lineas, loading: loadingLineas, crearLinea, actualizarLinea, eliminarLinea } = useLineasFactura(id)
   const [accionando, setAccionando] = useState(false)
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
   const [exportando, setExportando] = useState(false)
+  const [lineaModal, setLineaModal] = useState<{ visible: boolean; linea?: LineaFactura }>({ visible: false })
 
   const factura = facturas.find(f => f.id === id)
 
@@ -27,7 +29,6 @@ export default function FacturaDetalleScreen() {
     return <View style={styles.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
   }
 
-  // Agrupar IVA por porcentaje
   const ivaDesglose = lineas.reduce<Record<number, number>>((acc, l) => {
     const base = l.cantidad * l.precio_unitario
     acc[l.iva_porcentaje] = (acc[l.iva_porcentaje] ?? 0) + base * (l.iva_porcentaje / 100)
@@ -113,9 +114,20 @@ export default function FacturaDetalleScreen() {
 
         {/* Líneas */}
         <View style={styles.seccion}>
-          <Text style={styles.seccionTitulo}>Conceptos</Text>
-          {loadingLineas ? <ActivityIndicator color={Colors.primary} /> : lineas.map((l, i) => (
-            <View key={l.id} style={[styles.linea, i < lineas.length - 1 && styles.lineaBorde]}>
+          <View style={styles.seccionHeader}>
+            <Text style={styles.seccionTitulo}>Conceptos</Text>
+            <TouchableOpacity style={styles.btnAnadir} onPress={() => setLineaModal({ visible: true })}>
+              <Text style={styles.btnAnadirTexto}>+ Añadir</Text>
+            </TouchableOpacity>
+          </View>
+          {loadingLineas ? <ActivityIndicator color={Colors.primary} /> : lineas.length === 0 ? (
+            <Text style={styles.sinLineas}>Sin conceptos</Text>
+          ) : lineas.map((l, i) => (
+            <TouchableOpacity
+              key={l.id}
+              style={[styles.linea, i < lineas.length - 1 && styles.lineaBorde]}
+              onPress={() => setLineaModal({ visible: true, linea: l })}
+            >
               <View style={styles.lineaTop}>
                 <Text style={styles.lineaDesc}>{l.descripcion}</Text>
                 <Text style={styles.lineaTotal}>{fmt(l.cantidad * l.precio_unitario)}</Text>
@@ -123,7 +135,7 @@ export default function FacturaDetalleScreen() {
               <Text style={styles.lineaDetalle}>
                 {l.cantidad} {l.unidad} × {fmt(l.precio_unitario)} · IVA {l.iva_porcentaje}%
               </Text>
-            </View>
+            </TouchableOpacity>
           ))}
 
           {/* Totales fiscales */}
@@ -177,6 +189,25 @@ export default function FacturaDetalleScreen() {
           variante="danger"
         />
       </ScrollView>
+
+      <LineaModal
+        visible={lineaModal.visible}
+        titulo="Concepto"
+        onClose={() => setLineaModal({ visible: false })}
+        inicial={lineaModal.linea}
+        onGuardar={async (campos: CamposLinea) => {
+          if (lineaModal.linea) {
+            await actualizarLinea(lineaModal.linea.id, campos)
+          } else {
+            await crearLinea({
+              ...campos,
+              factura_id: id,
+              orden: lineas.length,
+            })
+          }
+        }}
+        onEliminar={lineaModal.linea ? () => eliminarLinea(lineaModal.linea!.id) : undefined}
+      />
     </>
   )
 }
@@ -192,7 +223,11 @@ const styles = StyleSheet.create({
   cliente: { fontSize: 14, fontWeight: '600', color: Colors.primary },
   origen: { fontSize: 12, color: Colors.muted, fontStyle: 'italic' },
   seccion: { backgroundColor: Colors.surface, borderRadius: 14, padding: 18, gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  seccionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   seccionTitulo: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
+  btnAnadir: { backgroundColor: Colors.accent, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
+  btnAnadirTexto: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  sinLineas: { fontSize: 14, color: Colors.textSecondary },
   linea: { paddingVertical: 10, gap: 3 },
   lineaBorde: { borderBottomWidth: 1, borderBottomColor: Colors.border },
   lineaTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
