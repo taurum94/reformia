@@ -16,6 +16,7 @@ export default function FacturaDetalleScreen() {
   const { facturas, actualizar, eliminar } = useFacturas(empresa?.id)
   const { lineas, loading: loadingLineas } = useLineasFactura(id)
   const [accionando, setAccionando] = useState(false)
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
 
   const factura = facturas.find(f => f.id === id)
 
@@ -42,10 +43,13 @@ export default function FacturaDetalleScreen() {
   }
 
   async function handleEliminar() {
-    Alert.alert('Eliminar factura', '¿Seguro? Esta acción no se puede deshacer.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: async () => { await eliminar(id); router.back() } },
-    ])
+    if (confirmandoEliminar) {
+      await eliminar(id)
+      router.back()
+    } else {
+      setConfirmandoEliminar(true)
+      setTimeout(() => setConfirmandoEliminar(false), 4000)
+    }
   }
 
   const estadosSiguientes: EstadoFactura[] = (['borrador', 'emitida', 'pagada', 'vencida'] as EstadoFactura[])
@@ -139,7 +143,11 @@ export default function FacturaDetalleScreen() {
           </View>
         </View>
 
-        <Button label="Eliminar factura" onPress={handleEliminar} variante="danger" />
+        <Button
+          label={confirmandoEliminar ? '¿Seguro? Pulsa de nuevo para confirmar' : 'Eliminar factura'}
+          onPress={handleEliminar}
+          variante="danger"
+        />
       </ScrollView>
     </>
   )

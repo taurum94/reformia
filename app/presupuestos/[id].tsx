@@ -18,6 +18,7 @@ export default function PresupuestoDetalleScreen() {
   const { presupuestos, actualizar, eliminar } = usePresupuestos(empresa?.id)
   const { lineas, loading: loadingLineas } = useLineasPresupuesto(id)
   const [accionando, setAccionando] = useState(false)
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
 
   const presupuesto = presupuestos.find(p => p.id === id)
 
@@ -37,66 +38,59 @@ export default function PresupuestoDetalleScreen() {
   }
 
   async function convertirAFactura() {
-    Alert.alert('Convertir a factura', '¿Crear una factura a partir de este presupuesto?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Convertir', onPress: async () => {
-          setAccionando(true)
-          try {
-            // Obtener siguiente número de serie de facturas (crea la serie si no existe)
-            const numero = await siguienteNumero(empresa!.id, 'factura')
+    if (accionando) return
+    setAccionando(true)
+    try {
+      const numero = await siguienteNumero(empresa!.id, 'factura')
 
-            // Crear factura
-            const { data: factura, error } = await supabase
-              .from('facturas')
-              .insert({
-                empresa_id: empresa!.id,
-                cliente_id: presupuesto.cliente_id,
-                presupuesto_id: presupuesto.id,
-                numero,
-                fecha: new Date().toISOString().split('T')[0],
-                estado: 'borrador',
-              })
-              .select()
-              .single()
-            if (error) throw error
+      const { data: factura, error } = await supabase
+        .from('facturas')
+        .insert({
+          empresa_id: empresa!.id,
+          cliente_id: presupuesto.cliente_id,
+          presupuesto_id: presupuesto.id,
+          numero,
+          fecha: new Date().toISOString().split('T')[0],
+          estado: 'borrador',
+        })
+        .select()
+        .single()
+      if (error) throw error
 
-            // Copiar líneas
-            const lineasFactura = lineas.map((l, i) => ({
-              factura_id: factura.id,
-              descripcion: l.descripcion,
-              unidad: l.unidad,
-              cantidad: l.cantidad,
-              precio_unitario: l.precio_unitario,
-              iva_porcentaje: l.iva_porcentaje,
-              orden: i,
-            }))
-            await supabase.from('lineas_factura').insert(lineasFactura)
+      const lineasFactura = lineas.map((l, i) => ({
+        factura_id: factura.id,
+        descripcion: l.descripcion,
+        unidad: l.unidad,
+        cantidad: l.cantidad,
+        precio_unitario: l.precio_unitario,
+        iva_porcentaje: l.iva_porcentaje,
+        orden: i,
+      }))
+      if (lineasFactura.length > 0) {
+        const { error: errLineas } = await supabase.from('lineas_factura').insert(lineasFactura)
+        if (errLineas) throw errLineas
+      }
 
-            await actualizar(id, { estado: 'aceptado' })
+      await actualizar(id, { estado: 'aceptado' })
 
-            Alert.alert('✓ Factura creada', `Factura ${numero} generada`, [
-              { text: 'Ver factura', onPress: () => router.replace({ pathname: '/facturas/[id]', params: { id: factura.id } }) },
-              { text: 'Quedarse aquí', style: 'cancel' },
-            ])
-          } catch (e: any) {
-            Alert.alert('Error', e.message)
-          } finally {
-            setAccionando(false)
-          }
-        },
-      },
-    ])
+      // Navegar directamente a la factura creada (Alert multi-botón no funciona en web)
+      router.replace({ pathname: '/facturas/[id]', params: { id: factura.id } })
+    } catch (e: any) {
+      Alert.alert('Error al crear factura', e.message)
+    } finally {
+      setAccionando(false)
+    }
   }
 
   async function handleEliminar() {
-    Alert.alert('Eliminar presupuesto', '¿Seguro? Esta acción no se puede deshacer.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar', style: 'destructive',
-        onPress: async () => { await eliminar(id); router.back() },
-      },
-    ])
+    // Alert.alert multi-botón no funciona en web — confirmación inline con estado
+    if (confirmandoEliminar) {
+      await eliminar(id)
+      router.back()
+    } else {
+      setConfirmandoEliminar(true)
+      setTimeout(() => setConfirmandoEliminar(false), 4000)
+    }
   }
 
   return (
@@ -194,7 +188,11 @@ export default function PresupuestoDetalleScreen() {
           />
         )}
 
-        <Button label="Eliminar presupuesto" onPress={handleEliminar} variante="danger" />
+        <Button
+          label={confirmandoEliminar ? '¿Seguro? Pulsa de nuevo para confirmar' : 'Eliminar presupuesto'}
+          onPress={handleEliminar}
+          variante="danger"
+        />
 
       </ScrollView>
     </>
