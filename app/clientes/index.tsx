@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   TextInput, ActivityIndicator, Alert,
 } from 'react-native'
-import { Stack, router } from 'expo-router'
+import { Stack, router, useFocusEffect } from 'expo-router'
 import { useEmpresa } from '../../hooks/useEmpresa'
 import { useClientes } from '../../hooks/useClientes'
 import { Colors } from '../../constants/colors'
@@ -14,8 +14,10 @@ function iniciales(nombre: string) {
 
 export default function ClientesScreen() {
   const { empresa } = useEmpresa()
-  const { clientes, loading } = useClientes(empresa?.id)
+  const { clientes, loading, recargar } = useClientes(empresa?.id)
   const [busqueda, setBusqueda] = useState('')
+
+  useFocusEffect(useCallback(() => { recargar() }, [empresa?.id]))
 
   const filtrados = clientes.filter(c =>
     c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||

@@ -12,6 +12,7 @@ import { Colors } from '../../constants/colors'
 export default function AjustesScreen() {
   const { empresa, loading, guardar } = useEmpresa()
   const [guardando, setGuardando] = useState(false)
+  const [confirmandoCerrar, setConfirmandoCerrar] = useState(false)
 
   const [form, setForm] = useState({
     razon_social: '',
@@ -59,16 +60,13 @@ export default function AjustesScreen() {
   }
 
   async function handleCerrarSesion() {
-    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Salir', style: 'destructive',
-        onPress: async () => {
-          await supabase.auth.signOut()
-          router.replace('/(auth)/login')
-        },
-      },
-    ])
+    if (confirmandoCerrar) {
+      await supabase.auth.signOut()
+      router.replace('/(auth)/login')
+    } else {
+      setConfirmandoCerrar(true)
+      setTimeout(() => setConfirmandoCerrar(false), 4000)
+    }
   }
 
   if (loading) {
@@ -186,6 +184,42 @@ export default function AjustesScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Geografía */}
+      <View style={styles.seccion}>
+        <Text style={styles.seccionTitulo}>Geografía</Text>
+        <TouchableOpacity style={styles.enlace} onPress={() => router.push('/configuracion/paises')}>
+          <View>
+            <Text style={styles.enlaceTitulo}>Países</Text>
+            <Text style={styles.enlaceDesc}>Catálogo de países en los que operas</Text>
+          </View>
+          <Text style={styles.enlaceArrow}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separador} />
+        <TouchableOpacity style={styles.enlace} onPress={() => router.push('/configuracion/provincias')}>
+          <View>
+            <Text style={styles.enlaceTitulo}>Provincias</Text>
+            <Text style={styles.enlaceDesc}>Provincias por país</Text>
+          </View>
+          <Text style={styles.enlaceArrow}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separador} />
+        <TouchableOpacity style={styles.enlace} onPress={() => router.push('/configuracion/zonas')}>
+          <View>
+            <Text style={styles.enlaceTitulo}>Zonas</Text>
+            <Text style={styles.enlaceDesc}>Segmentación geográfica dentro de cada provincia</Text>
+          </View>
+          <Text style={styles.enlaceArrow}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separador} />
+        <TouchableOpacity style={styles.enlace} onPress={() => router.push('/configuracion/ubicaciones')}>
+          <View>
+            <Text style={styles.enlaceTitulo}>Ubicaciones</Text>
+            <Text style={styles.enlaceDesc}>Combinaciones país/provincia/zona para precios diferenciados</Text>
+          </View>
+          <Text style={styles.enlaceArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Configuración avanzada */}
       <View style={styles.seccion}>
         <Text style={styles.seccionTitulo}>Configuración fiscal</Text>
@@ -208,7 +242,9 @@ export default function AjustesScreen() {
 
       {/* Cerrar sesión */}
       <TouchableOpacity style={styles.cerrarSesion} onPress={handleCerrarSesion}>
-        <Text style={styles.cerrarSesionText}>Cerrar sesión</Text>
+        <Text style={styles.cerrarSesionText}>
+          {confirmandoCerrar ? '¿Seguro? Pulsa de nuevo para confirmar' : 'Cerrar sesión'}
+        </Text>
       </TouchableOpacity>
 
     </ScrollView>

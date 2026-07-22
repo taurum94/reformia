@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Presupuesto, LineaPresupuesto } from '../types/database'
 
-export type PresupuestoConCliente = Presupuesto & { cliente_nombre?: string }
+export type PresupuestoConCliente = Presupuesto & {
+  cliente_nombre?: string
+  cliente_nif?: string
+  cliente_direccion?: string
+}
 
 export function usePresupuestos(empresaId: string | undefined) {
   const [presupuestos, setPresupuestos] = useState<PresupuestoConCliente[]>([])
@@ -17,7 +21,7 @@ export function usePresupuestos(empresaId: string | undefined) {
     setLoading(true)
     const { data } = await supabase
       .from('presupuestos')
-      .select('*, clientes(nombre)')
+      .select('*, clientes(nombre, nif, direccion)')
       .eq('empresa_id', empresaId)
       .order('created_at', { ascending: false })
 
@@ -25,6 +29,8 @@ export function usePresupuestos(empresaId: string | undefined) {
       (data ?? []).map((p: any) => ({
         ...p,
         cliente_nombre: p.clientes?.nombre,
+        cliente_nif: p.clientes?.nif,
+        cliente_direccion: p.clientes?.direccion,
       }))
     )
     setLoading(false)

@@ -15,6 +15,8 @@ export interface Empresa {
   web?: string
   logo_url?: string
   iban?: string
+  indirectos_porcentaje?: number
+  margen_porcentaje?: number
   created_at: string
 }
 
@@ -48,12 +50,30 @@ export interface TipoIva {
   por_defecto: boolean
 }
 
-export interface UbicacionGeografica {
+export interface Pais {
+  codigo: string
+  nombre: string
+}
+
+export interface Provincia {
+  codigo_pais: string
+  codigo: string
+  nombre: string
+}
+
+export interface Zona {
+  codigo_pais: string
+  codigo_provincia: string
+  codigo: string
+  nombre: string
+}
+
+export interface Ubicacion {
   id: string
-  pais: string
-  area?: string
-  zona?: string
   municipio?: string
+  codigo_pais?: string
+  codigo_provincia?: string
+  codigo_zona?: string
 }
 
 export interface Proveedor {
@@ -105,11 +125,11 @@ export interface LineaPresupuesto {
   cantidad: number
   precio_unitario: number
   iva_porcentaje: number
-  horas_mano_obra?: number
-  coste_hora?: number
-  materiales_coste?: number
-  indirectos_porcentaje?: number
-  margen_porcentaje?: number
+  horas_mano_obra?: number | null
+  coste_hora?: number | null
+  materiales_coste?: number | null
+  indirectos_porcentaje?: number | null
+  margen_porcentaje?: number | null
   orden: number
 }
 
@@ -133,6 +153,11 @@ export interface LineaFactura {
   cantidad: number
   precio_unitario: number
   iva_porcentaje: number
+  horas_mano_obra?: number | null
+  coste_hora?: number | null
+  materiales_coste?: number | null
+  indirectos_porcentaje?: number | null
+  margen_porcentaje?: number | null
   orden: number
 }
 

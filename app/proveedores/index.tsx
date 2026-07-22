@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator,
 } from 'react-native'
-import { Stack, router } from 'expo-router'
+import { Stack, router, useFocusEffect } from 'expo-router'
 import { useEmpresa } from '../../hooks/useEmpresa'
 import { useProveedores } from '../../hooks/useProveedores'
 import { Colors } from '../../constants/colors'
@@ -15,7 +15,9 @@ const CATEGORIAS: Record<string, string> = {
 
 export default function ProveedoresScreen() {
   const { empresa } = useEmpresa()
-  const { proveedores, loading } = useProveedores(empresa?.id)
+  const { proveedores, loading, recargar } = useProveedores(empresa?.id)
+
+  useFocusEffect(useCallback(() => { recargar() }, [empresa?.id]))
   const [busqueda, setBusqueda] = useState('')
 
   const filtrados = proveedores.filter(p =>

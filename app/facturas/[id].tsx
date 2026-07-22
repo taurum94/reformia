@@ -195,6 +195,8 @@ export default function FacturaDetalleScreen() {
         titulo="Concepto"
         onClose={() => setLineaModal({ visible: false })}
         inicial={lineaModal.linea}
+        indirectosPorDefecto={empresa?.indirectos_porcentaje}
+        margenPorDefecto={empresa?.margen_porcentaje}
         onGuardar={async (campos: CamposLinea) => {
           if (lineaModal.linea) {
             await actualizarLinea(lineaModal.linea.id, campos)

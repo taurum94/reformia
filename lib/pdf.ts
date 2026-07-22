@@ -22,12 +22,23 @@ function cabeceraEmpresa(empresa: Empresa) {
     </div>`
 }
 
+function desgloseLinea(l: LineaPresupuesto | LineaFactura): string {
+  const lp = l as LineaPresupuesto
+  const partes: string[] = []
+  if (lp.horas_mano_obra != null && lp.coste_hora != null)
+    partes.push(`Mano de obra: ${lp.horas_mano_obra}h × ${fmt(lp.coste_hora)}/h = ${fmt(lp.horas_mano_obra * lp.coste_hora)}`)
+  if (lp.materiales_coste != null)
+    partes.push(`Materiales: ${fmt(lp.materiales_coste)}`)
+  if (!partes.length) return ''
+  return `<div class="desglose">${partes.map(p => `<span>${p}</span>`).join('')}</div>`
+}
+
 function filasLineas(lineas: (LineaPresupuesto | LineaFactura)[]) {
   return lineas.map(l => {
     const subtotal = l.cantidad * l.precio_unitario
     return `
       <tr>
-        <td>${l.descripcion}</td>
+        <td>${l.descripcion}${desgloseLinea(l)}</td>
         <td class="c">${l.cantidad} ${l.unidad}</td>
         <td class="r">${fmt(l.precio_unitario)}</td>
         <td class="c">${l.iva_porcentaje}%</td>
@@ -78,6 +89,12 @@ const CSS = `
   .totales td { padding: 6px 10px; border: none; }
   .totales tr:last-child td { font-weight: 800; font-size: 15px;
     color: #1E3A5F; border-top: 2px solid #1E3A5F; padding-top: 10px; }
+  .desglose { font-size: 10px; color: #666; margin-top: 5px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .desglose span { background: #f0f4f8; padding: 2px 7px; border-radius: 4px; }
+  .resumen-costes { margin-bottom: 16px; }
+  .resumen-costes table { margin-bottom: 0; }
+  .resumen-costes td { padding: 5px 10px; border: none; font-size: 12px; color: #555; }
+  .resumen-costes .titulo { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #888; padding-bottom: 4px; }
   .notas { margin-top: 24px; padding: 14px; background: #fffbf5;
     border-left: 3px solid #F97316; border-radius: 4px; color: #555; font-size: 11px; }
   .iban { margin-top: 16px; text-align: center; font-size: 11px; color: #888; }
@@ -86,6 +103,22 @@ const CSS = `
 `
 
 type ClienteInfo = { nombre?: string; nif?: string; direccion?: string; email?: string; telefono?: string } | null
+
+function resumenCostesHtml(lineas: LineaPresupuesto[]): string {
+  const totalMO = lineas.reduce((s, l) =>
+    l.horas_mano_obra != null && l.coste_hora != null ? s + l.horas_mano_obra * l.coste_hora : s, 0)
+  const totalMat = lineas.reduce((s, l) =>
+    l.materiales_coste != null ? s + l.materiales_coste : s, 0)
+  if (!totalMO && !totalMat) return ''
+  return `
+    <div class="resumen-costes" style="margin-left:auto;width:260px;">
+      <table>
+        <tr><td colspan="2" class="titulo">Costes directos</td></tr>
+        ${totalMO ? `<tr><td>Mano de obra</td><td class="r">${fmt(totalMO)}</td></tr>` : ''}
+        ${totalMat ? `<tr><td>Materiales</td><td class="r">${fmt(totalMat)}</td></tr>` : ''}
+      </table>
+    </div>`
+}
 
 export function htmlPresupuesto(
   empresa: Empresa,
@@ -126,6 +159,8 @@ export function htmlPresupuesto(
       </tr></thead>
       <tbody>${filasLineas(lineas)}</tbody>
     </table>
+
+    ${resumenCostesHtml(lineas)}
 
     <div class="totales">
       <table>

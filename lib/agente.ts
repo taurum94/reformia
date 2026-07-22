@@ -22,35 +22,45 @@ export interface RespuestaAgente {
   lineas: LineaGenerada[]
 }
 
-// Obtiene los precios de mano de obra de la empresa para incluirlos en el prompt
-async function obtenerContexto(empresaId: string): Promise<string> {
-  const { data: precios } = await supabase
-    .from('precios_mano_obra')
-    .select('categoria, coste_hora')
-    .eq('empresa_id', empresaId)
-    .is('ubicacion_id', null)
+interface Contexto {
+  preciosStr: string
+  materialesStr: string
+  indirectosPct: number
+  margenPct: number
+}
 
-  const { data: materiales } = await supabase
-    .from('materiales')
-    .select('codigo, descripcion, categoria, unidad')
-    .eq('empresa_id', empresaId)
-    .limit(50)
+// Obtiene los precios de mano de obra, materiales y márgenes configurados
+async function obtenerContexto(empresaId: string): Promise<Contexto> {
+  const [{ data: precios }, { data: materiales }, { data: empresa }] = await Promise.all([
+    supabase.from('precios_mano_obra').select('categoria, coste_hora').eq('empresa_id', empresaId).is('ubicacion_id', null),
+    supabase.from('materiales').select('codigo, descripcion, categoria, unidad').eq('empresa_id', empresaId).limit(50),
+    supabase.from('empresas').select('indirectos_porcentaje, margen_porcentaje').eq('id', empresaId).single(),
+  ])
 
   const preciosStr = precios && precios.length > 0
-    ? precios.map(p => `  - ${p.categoria}: ${p.coste_hora}€/hora`).join('\n')
+    ? precios.map((p: any) => `  - ${p.categoria}: ${p.coste_hora}€/hora`).join('\n')
     : '  - (sin precios configurados, usa valores típicos del mercado español)'
 
   const materialesStr = materiales && materiales.length > 0
-    ? materiales.map(m => `  - [${m.codigo}] ${m.descripcion} (${m.unidad}) — ${m.categoria}`).join('\n')
+    ? materiales.map((m: any) => `  - [${m.codigo}] ${m.descripcion} (${m.unidad}) — ${m.categoria}`).join('\n')
     : '  - (sin catálogo configurado, estima costes de materiales típicos)'
 
-  return `PRECIOS DE MANO DE OBRA (€/hora):\n${preciosStr}\n\nCATÁLOGO DE MATERIALES:\n${materialesStr}`
+  return {
+    preciosStr,
+    materialesStr,
+    indirectosPct: (empresa as any)?.indirectos_porcentaje ?? 5,
+    margenPct: (empresa as any)?.margen_porcentaje ?? 20,
+  }
 }
 
-function buildSystemPrompt(contexto: string): string {
+function buildSystemPrompt(ctx: Contexto): string {
   return `Eres un experto en presupuestos de obras y reformas en España. Tu trabajo es ayudar a profesionales de la construcción a generar presupuestos detallados a partir de descripciones en lenguaje natural.
 
-${contexto}
+PRECIOS DE MANO DE OBRA (€/hora):
+${ctx.preciosStr}
+
+CATÁLOGO DE MATERIALES:
+${ctx.materialesStr}
 
 INSTRUCCIONES:
 1. Analiza la obra descrita por el profesional
@@ -58,7 +68,7 @@ INSTRUCCIONES:
 3. Para cada partida calcula: horas de mano de obra, coste de materiales, % indirectos y % margen
 4. Usa SIEMPRE los precios de mano de obra proporcionados arriba
 5. Estima costes de materiales con precios realistas del mercado español actual
-6. Aplica un 5% de indirectos y un 20% de margen por defecto salvo que se indique otro
+6. Aplica un ${ctx.indirectosPct}% de indirectos y un ${ctx.margenPct}% de margen por defecto salvo que se indique otro
 7. Aplica IVA del 21% por defecto (10% en rehabilitación de vivienda habitual)
 
 FORMATO DE RESPUESTA:
@@ -107,8 +117,8 @@ export async function consultarAgente(
   historial: MensajeChat[],
   mensajeUsuario: string
 ): Promise<RespuestaAgente> {
-  const contexto = await obtenerContexto(empresaId)
-  const systemPrompt = buildSystemPrompt(contexto)
+  const ctx = await obtenerContexto(empresaId)
+  const systemPrompt = buildSystemPrompt(ctx)
 
   const mensajes: MensajeChat[] = [
     { role: 'system', content: systemPrompt },

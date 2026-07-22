@@ -7,7 +7,29 @@
       "PowerShell(npm --version)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(p.dependencies\\).filter\\(k => k.includes\\('print'\\) || k.includes\\('shar'\\)\\), null, 2\\)\\)\")",
+      "Bash(npx expo *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\alfre\\\\Desktop\\\\ReformIA\" -Force)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(xargs grep -l \"presupuesto\\\\|budget\" -i)",
+      "mcp__5ab9f3fc-b201-4471-a03c-c5c870c19519__list_projects",
+      "mcp__5ab9f3fc-b201-4471-a03c-c5c870c19519__list_tables",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.dependencies, null, 2\\)\\)\")",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); console.log\\('URL:', process.env.EXPO_PUBLIC_SUPABASE_URL ? 'SET \\(' + process.env.EXPO_PUBLIC_SUPABASE_URL.substring\\(0,30\\) + '...\\)' : 'UNDEFINED'\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const env=fs.readFileSync\\('.env','utf8'\\); const url=env.match\\(/EXPO_PUBLIC_SUPABASE_URL=\\(.+\\)/\\); console.log\\('URL line:', url ? url[0].substring\\(0,50\\) : 'NOT FOUND'\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" https://mzioztykmyrkjkybmkjg.supabase.co/auth/v1/health --max-time 10)",
+      "Bash(curl -s -o /dev/null -w \"google: %{http_code}\\\\n\" https://www.google.com --max-time 10)",
+      "Bash(curl -s -o /dev/null -w \"supabase.com: %{http_code}\\\\n\" https://supabase.com --max-time 10)",
+      "Bash(nslookup mzioztykmyrkjkybmkjg.supabase.co)",
+      "Bash(git status *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(git stash *)",
+      "mcp__claude_ai_Supabase__execute_sql"
     ]
   }
 }

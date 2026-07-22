@@ -5,6 +5,7 @@ import { useEmpresa } from '../../hooks/useEmpresa'
 import { useProveedores } from '../../hooks/useProveedores'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
+import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { Colors } from '../../constants/colors'
 
 const CATEGORIAS = [
@@ -24,6 +25,8 @@ export default function ProveedorFormScreen() {
   const { empresa } = useEmpresa()
   const { proveedores, crear, actualizar, eliminar } = useProveedores(empresa?.id)
   const [guardando, setGuardando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+  const [modalEliminar, setModalEliminar] = useState(false)
   const [form, setForm] = useState({ nombre: '', nif: '', telefono: '', email: '', web: '', categorias: [] as string[] })
 
   useEffect(() => {
@@ -46,17 +49,17 @@ export default function ProveedorFormScreen() {
     if (!form.nombre.trim()) return Alert.alert('Campo obligatorio', 'El nombre es obligatorio')
     setGuardando(true)
     try {
-      if (esEdicion) { await actualizar(id!, form); Alert.alert('✓ Guardado', 'Proveedor actualizado') }
+      if (esEdicion) { await actualizar(id!, form); router.back() }
       else { await crear(form); Alert.alert('✓ Creado', 'Proveedor añadido'); router.back() }
     } catch (e: any) { Alert.alert('Error', e.message) }
     finally { setGuardando(false) }
   }
 
   async function handleEliminar() {
-    Alert.alert('Eliminar proveedor', '¿Seguro?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: async () => { try { await eliminar(id!); router.back() } catch (e: any) { Alert.alert('Error', e.message) } } },
-    ])
+    setEliminando(true)
+    try { await eliminar(id!); router.back() }
+    catch (e: any) { Alert.alert('Error', e.message) }
+    finally { setEliminando(false) }
   }
 
   if (esEdicion && proveedores.length === 0) return <View style={styles.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
@@ -89,8 +92,17 @@ export default function ProveedorFormScreen() {
         </View>
 
         <Button label={esEdicion ? 'Guardar cambios' : 'Crear proveedor'} onPress={handleGuardar} loading={guardando} />
-        {esEdicion && <Button label="Eliminar proveedor" onPress={handleEliminar} variante="danger" />}
+        {esEdicion && <Button label="Eliminar proveedor" onPress={() => setModalEliminar(true)} variante="danger" loading={eliminando} />}
       </ScrollView>
+      <ConfirmModal
+        visible={modalEliminar}
+        titulo="Eliminar proveedor"
+        mensaje="Esta acción no se puede deshacer."
+        labelConfirmar="Eliminar"
+        peligroso
+        onConfirmar={() => { setModalEliminar(false); handleEliminar() }}
+        onCancelar={() => setModalEliminar(false)}
+      />
     </>
   )
 }

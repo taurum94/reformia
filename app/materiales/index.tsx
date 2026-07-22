@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native'
-import { Stack, router } from 'expo-router'
+import { Stack, router, useFocusEffect } from 'expo-router'
 import { useEmpresa } from '../../hooks/useEmpresa'
 import { useMateriales } from '../../hooks/useMateriales'
 import { Colors } from '../../constants/colors'
 
 export default function MaterialesScreen() {
   const { empresa } = useEmpresa()
-  const { materiales, loading } = useMateriales(empresa?.id)
+  const { materiales, loading, recargar } = useMateriales(empresa?.id)
+
+  useFocusEffect(useCallback(() => { recargar() }, [empresa?.id]))
   const [busqueda, setBusqueda] = useState('')
   const [catFiltro, setCatFiltro] = useState<string | null>(null)
 

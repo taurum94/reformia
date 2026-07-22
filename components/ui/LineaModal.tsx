@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Modal, View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -11,6 +11,11 @@ export interface CamposLinea {
   cantidad: number
   precio_unitario: number
   iva_porcentaje: number
+  horas_mano_obra?: number | null
+  coste_hora?: number | null
+  materiales_coste?: number | null
+  indirectos_porcentaje?: number | null
+  margen_porcentaje?: number | null
 }
 
 interface Props {
@@ -20,46 +25,109 @@ interface Props {
   onEliminar?: () => Promise<void>
   inicial?: Partial<CamposLinea>
   titulo?: string
+  indirectosPorDefecto?: number
+  margenPorDefecto?: number
 }
 
 const IVA_OPCIONES = [0, 4, 10, 21]
 const UNIDADES = ['m²', 'm³', 'ml', 'ud', 'h', 'kg', 'partida']
 
-export function LineaModal({ visible, onClose, onGuardar, onEliminar, inicial, titulo = 'Partida' }: Props) {
+function toStr(v: number | null | undefined): string {
+  return v != null ? String(v) : ''
+}
+
+function parseN(s: string): number {
+  return parseFloat(s.replace(',', '.')) || 0
+}
+
+export function LineaModal({
+  visible, onClose, onGuardar, onEliminar, inicial, titulo = 'Partida',
+  indirectosPorDefecto = 5, margenPorDefecto = 20,
+}: Props) {
   const [descripcion, setDescripcion] = useState('')
   const [unidad, setUnidad] = useState('ud')
   const [cantidad, setCantidad] = useState('1')
-  const [precio, setPrecio] = useState('')
   const [iva, setIva] = useState(21)
+
+  // Modo simple
+  const [precio, setPrecio] = useState('')
+
+  // Modo desglose
+  const [modoDesglose, setModoDesglose] = useState(false)
+  const [horasMO, setHorasMO] = useState('')
+  const [costePH, setCostePH] = useState('')
+  const [matCantidad, setMatCantidad] = useState('')
+  const [matPrecioUnit, setMatPrecioUnit] = useState('')
+  const [margen, setMargen] = useState('20')
+  const [indirectos, setIndirectos] = useState('5')
+
   const [guardando, setGuardando] = useState(false)
   const [eliminando, setEliminando] = useState(false)
   const [confirmEliminar, setConfirmEliminar] = useState(false)
 
   useEffect(() => {
-    if (visible) {
-      setDescripcion(inicial?.descripcion ?? '')
-      setUnidad(inicial?.unidad ?? 'ud')
-      setCantidad(String(inicial?.cantidad ?? '1'))
-      setPrecio(inicial?.precio_unitario != null ? String(inicial.precio_unitario) : '')
-      setIva(inicial?.iva_porcentaje ?? 21)
-      setGuardando(false)
-      setEliminando(false)
-      setConfirmEliminar(false)
-    }
-  }, [visible])
+    if (!visible) return
+    setDescripcion(inicial?.descripcion ?? '')
+    setUnidad(inicial?.unidad ?? 'ud')
+    setCantidad(String(inicial?.cantidad ?? '1'))
+    setPrecio(inicial?.precio_unitario != null ? String(inicial.precio_unitario) : '')
+    setIva(inicial?.iva_porcentaje ?? 21)
+
+    const tieneDesglose = inicial?.horas_mano_obra != null || inicial?.materiales_coste != null
+    setModoDesglose(tieneDesglose)
+    setHorasMO(toStr(inicial?.horas_mano_obra))
+    setCostePH(toStr(inicial?.coste_hora))
+    setMatCantidad('')
+    setMatPrecioUnit('')
+    setMargen(toStr(inicial?.margen_porcentaje) || String(margenPorDefecto))
+    setIndirectos(toStr(inicial?.indirectos_porcentaje) || String(indirectosPorDefecto))
+
+    setGuardando(false)
+    setEliminando(false)
+    setConfirmEliminar(false)
+  }, [visible, indirectosPorDefecto, margenPorDefecto])
 
   const esEdicion = !!inicial?.descripcion
 
+  const matCosteCalc = parseN(matCantidad) * parseN(matPrecioUnit)
+  // Si el usuario no ha introducido componentes de materiales, conservar el valor guardado
+  const matCosteEfectivo = matCosteCalc > 0 ? matCosteCalc : (inicial?.materiales_coste ?? 0)
+
+  const precioCalculado = useMemo(() => {
+    const horas = parseN(horasMO)
+    const ph = parseN(costePH)
+    const matCalc = parseN(matCantidad) * parseN(matPrecioUnit)
+    const mat = matCalc > 0 ? matCalc : (inicial?.materiales_coste ?? 0)
+    const ind = parseN(indirectos)
+    const mg = parseN(margen)
+    const qty = parseN(cantidad) || 1
+    const costeDirecto = horas * ph + mat
+    if (costeDirecto <= 0) return 0
+    return (costeDirecto * (1 + ind / 100) * (1 + mg / 100)) / qty
+  }, [horasMO, costePH, matCantidad, matPrecioUnit, inicial?.materiales_coste, indirectos, margen, cantidad])
+
+  const precioFinal = modoDesglose ? precioCalculado : parseN(precio)
+  const qty = parseN(cantidad) || 1
+  const importeSinIVA = precioFinal * qty
+
+  const puedeGuardar = descripcion.trim().length > 0 &&
+    (modoDesglose ? precioCalculado > 0 : precio.trim().length > 0)
+
   async function handleGuardar() {
-    if (!descripcion.trim() || !precio.trim()) return
+    if (!puedeGuardar) return
     setGuardando(true)
     try {
       await onGuardar({
         descripcion: descripcion.trim(),
         unidad,
-        cantidad: parseFloat(cantidad.replace(',', '.')) || 1,
-        precio_unitario: parseFloat(precio.replace(',', '.')) || 0,
+        cantidad: parseN(cantidad) || 1,
+        precio_unitario: modoDesglose ? precioCalculado : parseN(precio),
         iva_porcentaje: iva,
+        horas_mano_obra: modoDesglose ? (parseN(horasMO) || null) : null,
+        coste_hora: modoDesglose ? (parseN(costePH) || null) : null,
+        materiales_coste: modoDesglose ? (matCosteEfectivo || null) : null,
+        indirectos_porcentaje: modoDesglose ? parseN(indirectos) : null,
+        margen_porcentaje: modoDesglose ? parseN(margen) : null,
       })
       onClose()
     } finally {
@@ -82,8 +150,6 @@ export function LineaModal({ visible, onClose, onGuardar, onEliminar, inicial, t
       setEliminando(false)
     }
   }
-
-  const puedeGuardar = descripcion.trim().length > 0 && precio.trim().length > 0
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -127,7 +193,7 @@ export function LineaModal({ visible, onClose, onGuardar, onEliminar, inicial, t
               </View>
             </ScrollView>
 
-            {/* Cantidad y Precio */}
+            {/* Cantidad */}
             <View style={styles.fila}>
               <View style={styles.campoMitad}>
                 <Text style={styles.label}>Cantidad</Text>
@@ -140,7 +206,43 @@ export function LineaModal({ visible, onClose, onGuardar, onEliminar, inicial, t
                   placeholderTextColor={Colors.muted}
                 />
               </View>
+
+              {/* IVA */}
               <View style={styles.campoMitad}>
+                <Text style={styles.label}>IVA</Text>
+                <View style={styles.chipsCompactos}>
+                  {IVA_OPCIONES.map(p => (
+                    <TouchableOpacity
+                      key={p}
+                      style={[styles.chipCompacto, iva === p && styles.chipActivo]}
+                      onPress={() => setIva(p)}
+                    >
+                      <Text style={[styles.chipText, iva === p && styles.chipTextoActivo]}>{p}%</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            {/* Toggle modo */}
+            <Text style={styles.label}>Modo de precio</Text>
+            <View style={styles.modoToggle}>
+              <TouchableOpacity
+                style={[styles.modoBtn, !modoDesglose && styles.modoBtnActivo]}
+                onPress={() => setModoDesglose(false)}
+              >
+                <Text style={[styles.modoBtnTexto, !modoDesglose && styles.modoBtnTextoActivo]}>Precio directo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modoBtn, modoDesglose && styles.modoBtnActivo]}
+                onPress={() => setModoDesglose(true)}
+              >
+                <Text style={[styles.modoBtnTexto, modoDesglose && styles.modoBtnTextoActivo]}>Calcular desde costes</Text>
+              </TouchableOpacity>
+            </View>
+
+            {!modoDesglose ? (
+              <>
                 <Text style={styles.label}>Precio unitario (€) *</Text>
                 <TextInput
                   style={styles.input}
@@ -150,30 +252,118 @@ export function LineaModal({ visible, onClose, onGuardar, onEliminar, inicial, t
                   placeholder="0,00"
                   placeholderTextColor={Colors.muted}
                 />
-              </View>
-            </View>
+              </>
+            ) : (
+              <View style={styles.desgloseBox}>
+                {/* Mano de obra */}
+                <Text style={styles.desgloseSeccion}>Mano de obra</Text>
+                <View style={styles.fila}>
+                  <View style={styles.campoMitad}>
+                    <Text style={styles.label}>Horas</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={horasMO}
+                      onChangeText={setHorasMO}
+                      keyboardType="decimal-pad"
+                      placeholder="0"
+                      placeholderTextColor={Colors.muted}
+                    />
+                  </View>
+                  <View style={styles.campoMitad}>
+                    <Text style={styles.label}>€ / hora</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={costePH}
+                      onChangeText={setCostePH}
+                      keyboardType="decimal-pad"
+                      placeholder="0,00"
+                      placeholderTextColor={Colors.muted}
+                    />
+                  </View>
+                </View>
+                {parseN(horasMO) > 0 && parseN(costePH) > 0 && (
+                  <Text style={styles.desgloseLinea}>
+                    Coste M.O.: {(parseN(horasMO) * parseN(costePH)).toFixed(2)} €
+                  </Text>
+                )}
 
-            {/* IVA */}
-            <Text style={styles.label}>IVA</Text>
-            <View style={styles.chips}>
-              {IVA_OPCIONES.map(p => (
-                <TouchableOpacity
-                  key={p}
-                  style={[styles.chip, iva === p && styles.chipActivo]}
-                  onPress={() => setIva(p)}
-                >
-                  <Text style={[styles.chipText, iva === p && styles.chipTextoActivo]}>{p}%</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                {/* Materiales */}
+                <Text style={[styles.desgloseSeccion, { marginTop: 10 }]}>Materiales</Text>
+                <View style={styles.fila}>
+                  <View style={styles.campoMitad}>
+                    <Text style={styles.label}>Cantidad</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={matCantidad}
+                      onChangeText={setMatCantidad}
+                      keyboardType="decimal-pad"
+                      placeholder="0"
+                      placeholderTextColor={Colors.muted}
+                    />
+                  </View>
+                  <View style={styles.campoMitad}>
+                    <Text style={styles.label}>€ / unidad</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={matPrecioUnit}
+                      onChangeText={setMatPrecioUnit}
+                      keyboardType="decimal-pad"
+                      placeholder="0,00"
+                      placeholderTextColor={Colors.muted}
+                    />
+                  </View>
+                </View>
+                {matCosteCalc > 0 && (
+                  <Text style={styles.desgloseLinea}>
+                    Coste materiales: {matCosteCalc.toFixed(2)} €
+                  </Text>
+                )}
+                {matCosteCalc === 0 && (inicial?.materiales_coste ?? 0) > 0 && (
+                  <Text style={styles.desgloseLinea}>
+                    Guardado: {Number(inicial!.materiales_coste).toFixed(2)} € — introduce cantidad y precio para recalcular
+                  </Text>
+                )}
+
+                {/* Indirectos y margen */}
+                <Text style={[styles.desgloseSeccion, { marginTop: 10 }]}>Indirectos y margen</Text>
+                <View style={styles.fila}>
+                  <View style={styles.campoMitad}>
+                    <Text style={styles.label}>Indirectos (%)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={indirectos}
+                      onChangeText={setIndirectos}
+                      keyboardType="decimal-pad"
+                      placeholder="5"
+                      placeholderTextColor={Colors.muted}
+                    />
+                  </View>
+                  <View style={styles.campoMitad}>
+                    <Text style={styles.label}>Margen (%)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={margen}
+                      onChangeText={setMargen}
+                      keyboardType="decimal-pad"
+                      placeholder="20"
+                      placeholderTextColor={Colors.muted}
+                    />
+                  </View>
+                </View>
+                <View style={[styles.campoMitad, styles.precioAutoBox]}>
+                  <Text style={styles.label}>Precio unitario calculado</Text>
+                  <Text style={styles.precioAutoValor}>
+                    {precioCalculado > 0 ? `${precioCalculado.toFixed(2)} €` : '—'}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Preview total */}
-            {puedeGuardar && (
+            {importeSinIVA > 0 && (
               <View style={styles.preview}>
                 <Text style={styles.previewLabel}>Importe sin IVA</Text>
-                <Text style={styles.previewValor}>
-                  {((parseFloat(cantidad.replace(',', '.')) || 1) * (parseFloat(precio.replace(',', '.')) || 0)).toFixed(2)} €
-                </Text>
+                <Text style={styles.previewValor}>{importeSinIVA.toFixed(2)} €</Text>
               </View>
             )}
 
@@ -216,7 +406,7 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {
     backgroundColor: Colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    maxHeight: '90%', paddingBottom: 24,
+    maxHeight: '92%', paddingBottom: 24,
   },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -236,13 +426,34 @@ const styles = StyleSheet.create({
   campoMitad: { flex: 1, gap: 6 },
   chipsScroll: { maxHeight: 44 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chipsCompactos: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 14,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface,
+  },
+  chipCompacto: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12,
     borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface,
   },
   chipActivo: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' },
   chipTextoActivo: { color: '#fff' },
+  modoToggle: {
+    flexDirection: 'row', borderRadius: 10, overflow: 'hidden',
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  modoBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: Colors.surface },
+  modoBtnActivo: { backgroundColor: Colors.primary },
+  modoBtnTexto: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+  modoBtnTextoActivo: { color: '#fff' },
+  desgloseBox: {
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: Colors.border, gap: 8,
+  },
+  desgloseSeccion: { fontSize: 13, fontWeight: '700', color: Colors.textPrimary },
+  desgloseLinea: { fontSize: 12, color: Colors.textSecondary, marginTop: -4 },
+  precioAutoBox: { justifyContent: 'flex-end' },
+  precioAutoValor: { fontSize: 20, fontWeight: '800', color: Colors.primary, paddingVertical: 8 },
   preview: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: Colors.surface, borderRadius: 10, padding: 14, marginTop: 4,

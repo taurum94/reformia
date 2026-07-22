@@ -5,6 +5,7 @@ import { useEmpresa } from '../../hooks/useEmpresa'
 import { useMateriales } from '../../hooks/useMateriales'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
+import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { Colors } from '../../constants/colors'
 
 const UNIDADES = ['ud', 'm²', 'm³', 'm', 'kg', 'l', 'saco', 'caja', 'rollo', 'ml']
@@ -16,6 +17,8 @@ export default function MaterialFormScreen() {
   const { empresa } = useEmpresa()
   const { materiales, crear, actualizar, eliminar } = useMateriales(empresa?.id)
   const [guardando, setGuardando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+  const [modalEliminar, setModalEliminar] = useState(false)
   const [form, setForm] = useState({ codigo: '', descripcion: '', categoria: 'Otros', unidad: 'ud' })
 
   useEffect(() => {
@@ -32,17 +35,17 @@ export default function MaterialFormScreen() {
     if (!form.codigo.trim()) return Alert.alert('Campo obligatorio', 'El código es obligatorio')
     setGuardando(true)
     try {
-      if (esEdicion) { await actualizar(id!, form); Alert.alert('✓ Guardado', 'Material actualizado') }
+      if (esEdicion) { await actualizar(id!, form); router.back() }
       else { await crear(form); Alert.alert('✓ Creado', 'Material añadido'); router.back() }
     } catch (e: any) { Alert.alert('Error', e.message) }
     finally { setGuardando(false) }
   }
 
   async function handleEliminar() {
-    Alert.alert('Eliminar material', '¿Seguro?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: async () => { try { await eliminar(id!); router.back() } catch (e: any) { Alert.alert('Error', e.message) } } },
-    ])
+    setEliminando(true)
+    try { await eliminar(id!); router.back() }
+    catch (e: any) { Alert.alert('Error', e.message) }
+    finally { setEliminando(false) }
   }
 
   if (esEdicion && materiales.length === 0) return <View style={styles.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
@@ -81,8 +84,18 @@ export default function MaterialFormScreen() {
         </View>
 
         <Button label={esEdicion ? 'Guardar cambios' : 'Crear material'} onPress={handleGuardar} loading={guardando} />
-        {esEdicion && <Button label="Eliminar material" onPress={handleEliminar} variante="danger" />}
+        {esEdicion && <Button label="Eliminar material" onPress={() => setModalEliminar(true)} variante="danger" loading={eliminando} />}
       </ScrollView>
+
+      <ConfirmModal
+        visible={modalEliminar}
+        titulo="Eliminar material"
+        mensaje="Esta acción no se puede deshacer."
+        labelConfirmar="Eliminar"
+        peligroso
+        onConfirmar={() => { setModalEliminar(false); handleEliminar() }}
+        onCancelar={() => setModalEliminar(false)}
+      />
     </>
   )
 }

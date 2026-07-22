@@ -1,17 +1,19 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform,
+  StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { Colors } from '../../constants/colors'
+import { Button } from '../../components/ui/Button'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const passwordRef = useRef<TextInput>(null)
 
   async function handleLogin() {
     if (!email || !password) {
@@ -52,28 +54,25 @@ export default function LoginScreen() {
             autoCapitalize="none"
             placeholder="tu@email.com"
             placeholderTextColor={Colors.muted}
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            submitBehavior="submit"
           />
 
           <Text style={styles.label}>Contraseña</Text>
           <TextInput
+            ref={passwordRef}
             style={styles.input}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
             placeholder="••••••••"
             placeholderTextColor={Colors.muted}
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
           />
 
-          <TouchableOpacity
-            style={[styles.btn, loading && styles.btnDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.btnText}>Entrar</Text>
-            }
-          </TouchableOpacity>
+          <Button label="Entrar" onPress={handleLogin} loading={loading} />
 
           <TouchableOpacity onPress={() => router.push('/(auth)/registro')}>
             <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
@@ -106,15 +105,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     backgroundColor: Colors.background,
   },
-  btn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   error: {
     color: Colors.error,
     fontSize: 13,

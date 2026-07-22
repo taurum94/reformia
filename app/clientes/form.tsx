@@ -7,6 +7,7 @@ import { useEmpresa } from '../../hooks/useEmpresa'
 import { useClientes } from '../../hooks/useClientes'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
+import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { Colors } from '../../constants/colors'
 import type { TipoCliente } from '../../types/database'
 
@@ -23,6 +24,8 @@ export default function ClienteFormScreen() {
   const { clientes, crear, actualizar, eliminar } = useClientes(empresa?.id)
 
   const [guardando, setGuardando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+  const [modalEliminar, setModalEliminar] = useState(false)
   const [form, setForm] = useState({
     nombre: '',
     nif: '',
@@ -61,7 +64,7 @@ export default function ClienteFormScreen() {
     try {
       if (esEdicion) {
         await actualizar(id!, form)
-        Alert.alert('✓ Guardado', 'Cliente actualizado correctamente')
+        router.back()
       } else {
         await crear(form)
         Alert.alert('✓ Creado', 'Cliente añadido correctamente')
@@ -75,20 +78,10 @@ export default function ClienteFormScreen() {
   }
 
   async function handleEliminar() {
-    Alert.alert('Eliminar cliente', '¿Seguro? Esta acción no se puede deshacer.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar', style: 'destructive',
-        onPress: async () => {
-          try {
-            await eliminar(id!)
-            router.back()
-          } catch (e: any) {
-            Alert.alert('Error', e.message)
-          }
-        },
-      },
-    ])
+    setEliminando(true)
+    try { await eliminar(id!); router.back() }
+    catch (e: any) { Alert.alert('Error', e.message) }
+    finally { setEliminando(false) }
   }
 
   if (esEdicion && clientes.length === 0) {
@@ -170,10 +163,20 @@ export default function ClienteFormScreen() {
         <Button label={esEdicion ? 'Guardar cambios' : 'Crear cliente'} onPress={handleGuardar} loading={guardando} />
 
         {esEdicion && (
-          <Button label="Eliminar cliente" onPress={handleEliminar} variante="danger" />
+          <Button label="Eliminar cliente" onPress={() => setModalEliminar(true)} variante="danger" loading={eliminando} />
         )}
 
       </ScrollView>
+
+      <ConfirmModal
+        visible={modalEliminar}
+        titulo="Eliminar cliente"
+        mensaje="Esta acción no se puede deshacer."
+        labelConfirmar="Eliminar"
+        peligroso
+        onConfirmar={() => { setModalEliminar(false); handleEliminar() }}
+        onCancelar={() => setModalEliminar(false)}
+      />
     </>
   )
 }

@@ -9,8 +9,9 @@ import { usePresupuestos, useLineasPresupuesto } from '../../hooks/usePresupuest
 import { EstadoBadge } from '../../components/ui/EstadoBadge'
 import { Button } from '../../components/ui/Button'
 import { LineaModal, type CamposLinea } from '../../components/ui/LineaModal'
+import { ClientePickerModal } from '../../components/ui/ClientePickerModal'
 import { Colors } from '../../constants/colors'
-import type { EstadoPresupuesto, LineaPresupuesto } from '../../types/database'
+import type { Cliente, EstadoPresupuesto, LineaPresupuesto } from '../../types/database'
 
 function fmt(n: number) { return n.toFixed(2).replace('.', ',') + ' €' }
 
@@ -23,6 +24,7 @@ export default function PresupuestoDetalleScreen() {
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
   const [exportando, setExportando] = useState(false)
   const [lineaModal, setLineaModal] = useState<{ visible: boolean; linea?: LineaPresupuesto }>({ visible: false })
+  const [clientePickerVisible, setClientePickerVisible] = useState(false)
 
   const presupuesto = presupuestos.find(p => p.id === id)
 
@@ -33,6 +35,11 @@ export default function PresupuestoDetalleScreen() {
   const baseImponible = lineas.reduce((s, l) => s + l.cantidad * l.precio_unitario, 0)
   const totalIva = lineas.reduce((s, l) => s + l.cantidad * l.precio_unitario * (l.iva_porcentaje / 100), 0)
   const total = baseImponible + totalIva
+  const totalManoObra = lineas.reduce((s, l) =>
+    l.horas_mano_obra != null && l.coste_hora != null ? s + l.horas_mano_obra * l.coste_hora : s, 0)
+  const totalMateriales = lineas.reduce((s, l) =>
+    l.materiales_coste != null ? s + l.materiales_coste : s, 0)
+  const hayDesglose = lineas.some(l => l.horas_mano_obra != null || l.materiales_coste != null)
 
   async function handleExportarPDF() {
     if (!empresa) return
@@ -137,8 +144,39 @@ export default function PresupuestoDetalleScreen() {
             </View>
             <EstadoBadge estado={presupuesto.estado} />
           </View>
-          {(presupuesto as any).cliente_nombre && (
-            <Text style={styles.cliente}>👤 {(presupuesto as any).cliente_nombre}</Text>
+        </View>
+
+        {/* Cliente */}
+        <View style={styles.seccion}>
+          <View style={styles.seccionHeader}>
+            <Text style={styles.seccionTitulo}>Cliente</Text>
+            <TouchableOpacity style={styles.btnAnadir} onPress={() => setClientePickerVisible(true)}>
+              <Text style={styles.btnAnadirTexto}>
+                {(presupuesto as any).cliente_nombre ? 'Cambiar' : 'Seleccionar'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {(presupuesto as any).cliente_nombre ? (
+            <View style={styles.clienteInfo}>
+              {(presupuesto as any).cliente_nif && (
+                <View style={styles.clienteFila}>
+                  <Text style={styles.clienteLabel}>Nº cliente</Text>
+                  <Text style={styles.clienteValor}>{(presupuesto as any).cliente_nif}</Text>
+                </View>
+              )}
+              <View style={styles.clienteFila}>
+                <Text style={styles.clienteLabel}>Nombre</Text>
+                <Text style={styles.clienteValor}>{(presupuesto as any).cliente_nombre}</Text>
+              </View>
+              {(presupuesto as any).cliente_direccion && (
+                <View style={styles.clienteFila}>
+                  <Text style={styles.clienteLabel}>Dirección</Text>
+                  <Text style={styles.clienteValor}>{(presupuesto as any).cliente_direccion}</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <Text style={styles.sinCliente}>Sin cliente asignado</Text>
           )}
         </View>
 
@@ -168,8 +206,41 @@ export default function PresupuestoDetalleScreen() {
                 <Text style={styles.lineaDetalle}>
                   {l.cantidad} {l.unidad} × {fmt(l.precio_unitario)} · IVA {l.iva_porcentaje}%
                 </Text>
+                {(l.horas_mano_obra != null || l.materiales_coste != null) && (
+                  <View style={styles.lineaDesglose}>
+                    {l.horas_mano_obra != null && l.coste_hora != null && (
+                      <Text style={styles.lineaDesglosePill}>
+                        Mano obra: {l.horas_mano_obra}h × {fmt(l.coste_hora)}/h = {fmt(l.horas_mano_obra * l.coste_hora)}
+                      </Text>
+                    )}
+                    {l.materiales_coste != null && (
+                      <Text style={styles.lineaDesglosePill}>
+                        Materiales: {fmt(l.materiales_coste)}
+                      </Text>
+                    )}
+                  </View>
+                )}
               </TouchableOpacity>
             ))
+          )}
+
+          {/* Resumen por categoría */}
+          {hayDesglose && (
+            <View style={styles.resumenCategorias}>
+              <Text style={styles.resumenTitulo}>Costes directos</Text>
+              {totalManoObra > 0 && (
+                <View style={styles.resumenFila}>
+                  <Text style={styles.resumenLabel}>Mano de obra</Text>
+                  <Text style={styles.resumenValor}>{fmt(totalManoObra)}</Text>
+                </View>
+              )}
+              {totalMateriales > 0 && (
+                <View style={styles.resumenFila}>
+                  <Text style={styles.resumenLabel}>Materiales</Text>
+                  <Text style={styles.resumenValor}>{fmt(totalMateriales)}</Text>
+                </View>
+              )}
+            </View>
           )}
 
           {/* Totales */}
@@ -239,6 +310,8 @@ export default function PresupuestoDetalleScreen() {
         visible={lineaModal.visible}
         onClose={() => setLineaModal({ visible: false })}
         inicial={lineaModal.linea}
+        indirectosPorDefecto={empresa?.indirectos_porcentaje}
+        margenPorDefecto={empresa?.margen_porcentaje}
         onGuardar={async (campos: CamposLinea) => {
           if (lineaModal.linea) {
             await actualizarLinea(lineaModal.linea.id, campos)
@@ -251,6 +324,18 @@ export default function PresupuestoDetalleScreen() {
           }
         }}
         onEliminar={lineaModal.linea ? () => eliminarLinea(lineaModal.linea!.id) : undefined}
+      />
+
+      <ClientePickerModal
+        visible={clientePickerVisible}
+        onClose={() => setClientePickerVisible(false)}
+        empresaId={empresa?.id}
+        onSeleccionar={async (cliente: Cliente) => {
+          setAccionando(true)
+          try { await actualizar(id, { cliente_id: cliente.id }) }
+          catch (e: any) { Alert.alert('Error', e.message) }
+          finally { setAccionando(false) }
+        }}
       />
     </>
   )
@@ -286,4 +371,16 @@ const styles = StyleSheet.create({
   totalFinalValor: { fontSize: 18, fontWeight: '800', color: Colors.primary },
   estadoBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   estadoBtn: { flex: 1, minWidth: 100 },
+  lineaDesglose: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  lineaDesglosePill: { fontSize: 11, color: Colors.textSecondary, backgroundColor: Colors.background, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  resumenCategorias: { borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10, gap: 4 },
+  resumenTitulo: { fontSize: 12, fontWeight: '700', color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  resumenFila: { flexDirection: 'row', justifyContent: 'space-between' },
+  resumenLabel: { fontSize: 13, color: Colors.textSecondary },
+  resumenValor: { fontSize: 13, color: Colors.textPrimary, fontWeight: '600' },
+  clienteInfo: { gap: 8 },
+  clienteFila: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  clienteLabel: { fontSize: 13, color: Colors.textSecondary, minWidth: 80 },
+  clienteValor: { flex: 1, fontSize: 13, fontWeight: '600', color: Colors.textPrimary, textAlign: 'right' },
+  sinCliente: { fontSize: 14, color: Colors.textSecondary },
 })

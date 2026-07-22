@@ -2,16 +2,22 @@ import { useEffect, useState } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { router, useSegments } from 'expo-router'
+import { LogBox } from 'react-native'
 import { supabase } from '../lib/supabase'
 import type { Session } from '@supabase/supabase-js'
+
+LogBox.ignoreLogs(['Failed to fetch'])
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const segments = useSegments()
 
   useEffect(() => {
-    // Sesión inicial
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    // Sesión inicial — si el refresh falla (token caducado), tratar como sin sesión
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) setSession(null)
+      else setSession(data.session)
+    })
 
     // Escucha cambios de sesión (login/logout)
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
